@@ -1,0 +1,10 @@
+#%RAML 1.0 DataType
+type: object
+properties:
+  email: string
+  password: string
+  phone: 
+    type: string
+    pattern: ^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$
+  nickName: string
+example: !include ../examples/userExample.json

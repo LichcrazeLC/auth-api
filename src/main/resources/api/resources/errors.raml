@@ -1,0 +1,30 @@
+#%RAML 1.0 Library
+usage: This library defines some basic traits
+traits:
+  hasBadRequest:
+    responses:
+      400:
+        body:
+          application/json:
+            example: {
+                        "message": "Bad request",
+                        "error": " Error validating JSON. Error: - Missing required field statusType  "
+                      }
+      
+  hasBeenCreated:
+    responses:
+      201:
+        body:
+          application/json:
+            example: {"message": "User was created"}
+
+         
+  hasInternalError:
+    responses:
+      500:
+        body:
+          application/json:
+            example: {
+                        "message": "Something goes wrong",
+                        "error": "Unknown Exception"
+                      }

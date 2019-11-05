@@ -1,0 +1,32 @@
+#%RAML 1.0
+title: Authentification API
+version: v1
+baseUri: https://safeNudes.xxx/{version}
+protocols: [HTTPS]
+mediaType: application/json
+securitySchemes:
+  basicAuth: !include ./resources/securitySchema.raml
+uses:
+  error: resources/errors.raml
+types: 
+  user: !include ./resources/user-dataType.raml
+  
+/login:
+  description: User Authentification. 
+  securedBy: basicAuth
+  get:
+   description: It will return an access-tocken which will be valid per session
+   responses:
+    200:
+      body:
+        application/json:
+          example: {"Access-Tocken": validTocken}
+
+/registration:
+  description: User registration 
+  post:
+    description: Crate new user
+    is: [error.hasBadRequest, error.hasBeenCreated, error.hasInternalError ]
+    body:
+      application/json:
+        type: user
