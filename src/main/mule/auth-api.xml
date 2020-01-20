@@ -1,22 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd       http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd       http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
-    <configuration-properties file="mule-artifact.properties" />
-    <http:listener-config name="httpListenerConfigDefault">
-        <http:listener-connection host="0.0.0.0" port="${http.port}" />
-    </http:listener-config>
-    <apikit:config name="auth-api-config" raml="auth-api.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+<mule xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd ">
     <flow name="auth-api-main">
-        <http:listener config-ref="httpListenerConfigDefault" path="/api/*">
+        <http:listener config-ref="HTTP_Listener_config" path="/api/*">
             <http:response statusCode="#[vars.httpStatus default 200]">
-                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
             </http:response>
             <http:error-response statusCode="#[vars.httpStatus default 500]">
-                <http:body>#[payload]</http:body>
-                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+                <http:body><![CDATA[#[payload]]]></http:body>
             </http:error-response>
         </http:listener>
-        <apikit:router config-ref="auth-api-config" />
-		<error-handler>
+        <apikit:router config-ref="auth-api-config"/>
+        <error-handler>
             <on-error-propagate type="APIKIT:BAD_REQUEST">
                 <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
                     <ee:message>
@@ -30,7 +23,7 @@ output application/json
                     </ee:variables>
                 </ee:transform>
             </on-error-propagate>
-            <on-error-propagate type="APIKIT:NOT_FOUND">
+            <on-error-propagate type="APIKIT:NOT_FOUND" enableNotifications="true" logException="true">
                 <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
                     <ee:message>
                         <ee:set-payload><![CDATA[%dw 2.0
@@ -43,7 +36,7 @@ output application/json
                     </ee:variables>
                 </ee:transform>
             </on-error-propagate>
-			<on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED" enableNotifications="true" logException="true">
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
                 <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
                     <ee:message>
                         <ee:set-payload><![CDATA[%dw 2.0
@@ -98,7 +91,7 @@ output application/json
         </error-handler>
     </flow>
     <flow name="auth-api-console">
-        <http:listener config-ref="httpListenerConfigDefault" path="/console/*">
+        <http:listener config-ref="HTTP_Listener_config" path="/console/*">
             <http:response statusCode="#[vars.httpStatus default 200]">
                 <http:headers>#[vars.outboundHeaders default {}]</http:headers>
             </http:response>
@@ -107,7 +100,7 @@ output application/json
                 <http:headers>#[vars.outboundHeaders default {}]</http:headers>
             </http:error-response>
         </http:listener>
-        <apikit:console config-ref="auth-api-config" />
+        <apikit:console config-ref="auth-api-config"/>
         <error-handler>
             <on-error-propagate type="APIKIT:NOT_FOUND">
                 <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
@@ -125,28 +118,15 @@ output application/json
         </error-handler>
     </flow>
     <flow name="get:\login:auth-api-config">
-        <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd" doc:id="92e5d918-7f24-4ed6-b15a-107f0cf6eac1">
-            <ee:message>
-                <ee:set-payload><![CDATA[%dw 2.0
-output application/json
----
-{
-  "Access-Tocken": "validTocken"
-}]]></ee:set-payload>
-            </ee:message>
-        </ee:transform>
+		<flow-ref doc:name="implementation_extractUser_Flow" doc:id="a5611115-a5f8-4106-94c9-e34ddc2601b7" name="implementation_extractUser_Flow"/>
     </flow>
-    <flow name="post:\registration:application\json:auth-api-config">
-        <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
-            <ee:message>
-                <ee:set-payload><![CDATA[%dw 2.0
-output application/json
----
-{
-  message: "Bad request",
-  error: " Error validating JSON. Error: - Missing required field statusType  "
-}]]></ee:set-payload>
-            </ee:message>
-        </ee:transform>
+    <flow name="get:\check\code:auth-api-config" doc:id="01f40e63-5a74-4f19-9984-52448e3f0f86" >
+		<flow-ref doc:name="implementation_checkUniqueCode_Flow" doc:id="aae6ac53-870e-4a63-9d82-55f862b527c1" name="implementation_checkUniqueCode_Flow"/>
+	</flow>
+	<flow name="get:\check\token\(userId):auth-api-config" doc:id="8a84b0ea-49ef-45a4-b1c6-b63b574b48cb" >
+		<flow-ref doc:name="implementation_checkToken_Flow" doc:id="f0789141-9b56-42c6-8981-10a8d84ea333" name="implementation_checkToken_Flow"/>
+	</flow>
+	<flow name="post:\registration:application\json:auth-api-config">
+		<flow-ref doc:name="implementation_createUser_Flow" doc:id="c5e4e548-9bc7-4f35-90b4-4388376ff605" name="implementation_createUser_Flow"/>
     </flow>
 </mule>

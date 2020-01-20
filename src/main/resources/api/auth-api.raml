@@ -12,21 +12,65 @@ types:
   user: !include ./resources/user-dataType.raml
   
 /login:
-  description: User Authentification. 
+  description: User Authentification.  Check if user exists
   securedBy: basicAuth
   get:
-   description: It will return an access-tocken which will be valid per session
-   responses:
-    200:
-      body:
-        application/json:
-          example: {"Access-Tocken": validTocken}
+    headers: 
+      credentials:
+        description: login and password encoded in Base64
+        type: string
+        required: true     
+    responses:
+      200:
+        body: 
+          application/json:
+            example: {"message": "Please check and enter unique code ..."}
+        
+/check:
+  /code:
+    description: Check unique code
+    get:
+      queryParameters:
+        email:
+          type: string
+          required: true
+        code:
+          type: integer
+          required: true
+      responses:
+        200:
+          body:
+            application/json:
+              example: {"Access-Token": validTocken}
+  /token:
+    /{userId}:
+      description: check if token is valid
+      get:
+        headers:
+          update:
+            description: used for token update
+            type: boolean
+            required: false
+          Access-Token:
+            type: string
+            required: true        
+        responses:
+          200:
+            body:
+              application/json:
+                example: {"status":"Valid"}
 
 /registration:
   description: User registration 
   post:
     description: Crate new user
-    is: [error.hasBadRequest, error.hasBeenCreated, error.hasInternalError ]
+    is: [error.hasBadRequest, error.hasInternalError ]
     body:
       application/json:
         type: user
+    responses:
+      201:
+        body:
+          application/json:
+            example: {"message": "User was created"}
+        

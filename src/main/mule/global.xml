@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:spring="http://www.mulesoft.org/schema/mule/spring" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/spring http://www.mulesoft.org/schema/mule/spring/current/mule-spring.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd">
+    <apikit:config name="auth-api-config" raml="api/auth-api.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" api="api\auth-api.raml"/>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="7a5399e7-1f3d-4fb6-89ec-1b01a42e7c46" >
+		<http:listener-connection host="0.0.0.0" port="${http.port}">
+		</http:listener-connection>
+	</http:listener-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="dae67470-3dc4-49cb-b86f-64557ed3bac6" file="dev.properties" />
+	<os:config name="ObjectStore_Config" doc:name="ObjectStore Config" doc:id="3fd02d3c-3dcd-457b-849f-93401afbacd8" >
+		<os:connection />
+	</os:config>
+	<os:object-store name="uniqueCode_store" doc:name="Object store" doc:id="c241ff6e-f399-4027-b330-a53f3768b788" maxEntries="100" expirationInterval="5" config-ref="ObjectStore_Config" entryTtl="5" entryTtlUnit="MINUTES"/>
+	<spring:config name="Spring_Config" doc:name="Spring Config" doc:id="bd619b2c-099c-4f3c-bc8e-921b31eccb81" files="beans.xml" />
+	<db:config name="user_db_config" doc:name="Database Config" doc:id="bf917356-94ab-4b34-9a10-2c599e9b910e" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="rootpass" database="usersdb" >
+			<db:connection-properties >
+				<db:connection-property key="useSSL" value="false" />
+			</db:connection-properties>
+		</db:my-sql-connection>
+	</db:config>
+</mule>

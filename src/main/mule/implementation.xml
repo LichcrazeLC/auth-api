@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:java="http://www.mulesoft.org/schema/mule/java" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+	<email:smtp-config name="Email_SMTP" doc:name="Email SMTP"
+		doc:id="0498a17a-72bd-41db-8120-4ed87e51d62e">
+		<email:smtp-connection host="smtp.gmail.com"
+			user="walletobe2019@gmail.com" password="walle2019" port="587">
+			<email:properties>
+				<email:property key="mail.smtp.starttls.enable"
+					value="true" />
+				<email:property key="mail.smtp.auth" value="true" />
+			</email:properties>
+		</email:smtp-connection>
+	</email:smtp-config>
+	<http:request-config name="HTTP_User_Request_configuration"
+		doc:name="HTTP Request configuration" doc:id="d57004ed-e51a-4f03-81f9-9ad53c324584"
+		basePath="/api">
+		<http:request-connection host="localhost"
+			port="8081" />
+	</http:request-config>
+	<flow name="implementation_extractUser_Flow" doc:id="d1c8cbe6-6aea-4b56-b183-3189fbdbf7b6">
+		<logger level="INFO" doc:name="Logger" doc:id="14252d70-1bbb-4e9f-b09c-ba22b52b5704" message="Check User"/>
+		<ee:transform doc:name="Transform Message"
+			doc:id="41a78dd2-f481-4947-b7f8-f4aa4f26ace1">
+			<ee:message>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="user" ><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/java
+var credential = fromBase64(attributes.headers.credentials) as String
+var splitCredential = credential splitBy(":")
+---
+{
+	email: splitCredential[0],
+	password: splitCredential[1]
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<http:request method="GET" doc:name="Get User"
+			doc:id="37f1310d-5591-41b7-95a9-5118ed1b6ad4" config-ref="HTTP_User_Request_configuration"
+			path="/users">
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	email : vars.user.email
+}]]]></http:query-params>
+		</http:request>
+		<choice doc:name="Choice" doc:id="9c1c613a-e836-4bdc-a24f-bf064149209b">
+			<when expression="#[payload.Id == null]">
+				<raise-error doc:name="Raise error" doc:id="e68087aa-8298-4c1c-b63b-01480d8d4fb6" type="USER:NOT_FOUND" description="Invalid Login or Password"/>
+			</when>
+			<otherwise>
+				<flow-ref doc:name="implementation_checkUserPassword_SubFlow" doc:id="e5e467e6-376a-4014-b736-1fa90caaf904" name="implementation_checkUserPassword_SubFlow"/>
+			</otherwise>
+		</choice>
+		<error-handler ref="implementation_unathorizedAccessError_Handler"/>
+	</flow>
+	<sub-flow name="implementation_checkUserPassword_SubFlow" doc:id="01c74bc3-8c4a-44e0-800d-7cf8f8c5465f" >
+		<choice doc:name="Choice" doc:id="8c9b35a9-f98d-41ec-826a-3344d93a3ce4" >
+			<when expression="#[(payload.Password as String) == vars.user.password]">
+				<flow-ref doc:name="implementation_generateUniqueCode_SubFlow" doc:id="6e8cd12e-5de8-4b45-8fff-9fba6f1dec7b" name="implementation_generateUniqueCode_SubFlow" />
+				<async doc:name="Async" doc:id="f70ee9af-7bd8-465f-8c58-5c93560a610f" >
+					<email:send doc:name="Send" doc:id="48b877bd-0592-4365-a13d-4ebf478b6954" config-ref="Email_SMTP" fromAddress="safetansfer@gmail.com" subject="Authentification Code">
+			<email:to-addresses>
+				<email:to-address value="#[payload.Email]" />
+			</email:to-addresses>
+			<email:body contentType="text/plain">
+				<email:content><![CDATA[#["Unique Code for Two Factor Authentification.\n \t TOTP Code : " ++ vars.uniqueCode as String]]]></email:content>
+			</email:body>
+		</email:send>
+					<os:store doc:name="Store unique code" doc:id="bda71c0a-8bd0-407a-be15-cf4842eb4b6d" key="#[payload.Email]" objectStore="uniqueCode_store">
+					<os:value><![CDATA[#[{
+	code: vars.uniqueCode,
+	method: "GET"
+}]]]></os:value>
+				</os:store>
+				</async>
+				<set-payload value='#[output application/json --- {message: "Please check and enter unique code ..."}]' doc:name="Set Payload" doc:id="8e7a12e1-0a41-4548-8137-ca835ecfd584" />
+			</when>
+			<otherwise >
+				<raise-error doc:name="Raise error" doc:id="0aaf3b58-f1ab-42d2-b81c-bdfe926d6b88" type="USER:WRONG_PASSWORD" description="Invalid Login or Password"/>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<flow name="implementation_createUser_Flow" doc:id="0025c9c2-9762-4497-bae6-bc891345346b" >
+		<set-variable value="#[payload]" doc:name="Set user" doc:id="6e29cce6-fea3-41ce-9684-35023c1c0acd" variableName="user"/>
+		<http:request method="POST" doc:name="Post User" doc:id="768a075a-c2df-4350-8101-891cb18b2eef" config-ref="HTTP_User_Request_configuration" path="/users"/>
+		<flow-ref doc:name="implementation_generateUniqueCode_SubFlow" doc:id="c61a9bed-6094-4fb2-9ea4-db99d67e786f" name="implementation_generateUniqueCode_SubFlow" />
+		<logger level="INFO" doc:name="Logger" doc:id="84ef1108-0d28-4213-b319-96f23f9ef6d5" message="#[vars.user]"/>
+		<async doc:name="Async" doc:id="28cb1a3a-c463-4cdf-a0db-5cba9f937e19" >
+			<email:send doc:name="Send" doc:id="61548d17-ab87-41c7-a2d1-75bad310c32a" config-ref="Email_SMTP" fromAddress="safetansfer@gmail.com" subject="Welcome">
+			<email:to-addresses>
+				<email:to-address value="#[vars.user.Email]" />
+			</email:to-addresses>
+			<email:body contentType="text/plain">
+				<email:content><![CDATA[#["Welcome to SafeTransfer. We try to protect your data ... \n \t Your Validation Code : " ++ vars.uniqueCode as String]]]></email:content>
+			</email:body>
+		</email:send>
+			<os:store doc:name="Store uniqueCode" doc:id="ec7faf0b-769d-43a4-bb16-071069691978" key="#[vars.user.Email]" objectStore="uniqueCode_store">
+			<os:value><![CDATA[#[{
+	code: vars.uniqueCode,
+	method: "POST"
+}]]]></os:value>
+		</os:store>
+		</async>
+		<set-payload value='#[output application/json --- {message: "Please check and enter unique code ..."}]' doc:name="Set Payload" doc:id="1a5bf1d1-4a2c-447b-bb59-303663f1ef42" />
+	</flow>
+	<flow name="implementation_checkUniqueCode_Flow" doc:id="a09dc5e2-ce39-471e-9891-dfc2fa11e1e5" >
+		<set-variable value="#[attributes.queryParams.code]" doc:name="Set code" doc:id="9ad652c9-bb1c-4baf-81fb-60f9037cb69d" variableName="code" />
+		<set-variable value="#[attributes.queryParams.email]" doc:name="Set email" doc:id="2fd6e64a-7de5-405e-9168-ddbdadfe1c11" variableName="email" />
+		<logger level="INFO" doc:name="Logger" doc:id="7eb452db-d161-43f9-a09b-7abff62e9e2e" message='#[vars.code ++ " : " ++ vars.email]'/>
+		<os:retrieve doc:name="Retrieve" doc:id="03f857cd-c56c-4165-878a-6ae5559e8a01" key="#[vars.email]" objectStore="uniqueCode_store"/>
+		<set-variable value="#[payload.method]" doc:name="Set method" doc:id="612bbc56-bcb0-4ec3-af68-c1d40f8b2bdd" variableName="method"/>
+		<choice doc:name="Choice" doc:id="b6bb84e3-db8a-49df-a9a8-2c694a78b402" >
+			<when expression="#[(payload.code as String ) == vars.code]">
+				<logger level="INFO" doc:name="Logger" doc:id="7a7444fd-af53-4a73-8448-5fdfe42224b9" message="#[payload]"/>
+				<http:request method="GET" doc:name="Get User By Email" doc:id="9db070e4-ec39-4063-b25d-652e7053a4bb" config-ref="HTTP_User_Request_configuration" path="/users">
+					<http:query-params><![CDATA[#[output application/java
+---
+{
+	email : vars.email
+}]]]></http:query-params>
+				</http:request>
+				<set-variable value="#[payload.Id]" doc:name="Set userId" doc:id="edb7bc30-ca92-4264-a3bf-12a050c00e2c" variableName="userId"/>
+				<flow-ref doc:name="implementation_generateToken_SubFlow" doc:id="7ace6e49-b390-47b6-a548-a1b9405c12f1" name="implementation_generateToken_SubFlow"/>
+				<choice doc:name="Choice" doc:id="cf6471ca-656e-49c8-b959-c623e6cbd5d0">
+					<when expression='#[vars.method == "POST"]'>
+						<flow-ref doc:name="implementation_saveToken_SubFlow" doc:id="86d009bb-77ec-40df-9d0e-219a2442fde4" name="implementation_saveToken_SubFlow"/>
+					</when>
+					<otherwise >
+						<flow-ref doc:name="implementation_updateToken_SubFlow" doc:id="9c9f9128-bfb1-4467-b309-9efc287379a1" name="implementation_updateToken_SubFlow" />
+					</otherwise>
+				</choice>
+				<os:remove doc:name="Remove" doc:id="2699bbdd-e30b-4879-ac8e-08e4cdf74b61" key="#[vars.email]" objectStore="uniqueCode_store"/>
+				<set-payload value='#[output application/json --- {"Access-Token": vars.token}]' doc:name="Set access  token" doc:id="c262bca9-54c5-4059-a2a1-43155926ef36" />
+			</when>
+			<otherwise>
+				<raise-error doc:name="Raise error" doc:id="d60ccc8a-196f-4ede-92de-d542fc67b7ec" type="CODE:INVALID_VALUE" description="Unique code is not valid"/>
+			</otherwise>
+		</choice>
+		<error-handler ref="implementation_unathorizedAccessError_Handler"/>
+		
+	</flow>
+	<flow name="implementation_checkToken_Flow" doc:id="919b2cba-06f0-407b-9e55-fac7f5840c29" >
+		<logger level="INFO" doc:name="Logger" doc:id="31fa88bd-ba62-4f57-9a45-5e4bbc8a9e0e" message="#[&quot;Token: &quot; ++ attributes.headers.'Access-Token']"/>
+		<choice doc:name="Choice" doc:id="78af97b4-9143-4805-9685-b94071dd2613" >
+			<when expression='#[attributes.headers.update == "true"]'>
+				<ee:transform doc:name="Transform Message" doc:id="2ec5001f-8fa8-4398-9a37-dff5b0d54846" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	Name: "Updated Token"
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="userId" ><![CDATA[%dw 2.0
+output application/java
+---
+attributes.uriParams.userId default( random() * 1000)]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<flow-ref doc:name="implementation_generateToken_SubFlow" doc:id="0c241f09-8c87-4475-a05c-782884d7e422" name="implementation_generateToken_SubFlow"/>
+				<logger level="INFO" doc:name="Logger" doc:id="333dc9ea-cd27-4366-ba9a-31cecfb67a75" message="#[vars.token]" />
+				<flow-ref doc:name="implementation_updateToken_SubFlow" doc:id="b1bb9f5a-9cba-4c52-94fc-b60c154086d2" name="implementation_updateToken_SubFlow"/>
+				<set-payload value='#[output application/json --- {status: "Updated"}]' doc:name="Set Payload" doc:id="c84acf9a-0068-4523-9613-c004455f3bb4" />
+			</when>
+			<otherwise>
+				<db:select doc:name="Select token by user id" doc:id="c7cfa9a5-33b9-472e-b22b-c51916e2bc15" config-ref="user_db_config">
+			<db:sql>select token from token
+where userId = :userId</db:sql>
+			<db:input-parameters><![CDATA[#[{
+	userId: attributes.uriParams.userId
+}]]]></db:input-parameters>
+		</db:select>
+				<choice doc:name="Choice" doc:id="c7220743-632b-458b-9625-975bd00c4882" >
+					<when expression="#[payload == attributes.headers.'Access-Token']">
+						<set-payload value='#[output application/json --- {status: "Valid"}]' doc:name="Set Payload" doc:id="fc0262a6-63e3-4655-a590-5c556d95c13a" />
+					</when>
+					<otherwise >
+						<set-payload value='#[output application/json --- {status: "Invalid"}]' doc:name="Set Payload" doc:id="89a948b5-ff9c-4542-b095-28af93995ad1" />
+					</otherwise>
+				</choice>
+			</otherwise>
+		</choice>
+	</flow>
+	<sub-flow name="implementation_generateToken_SubFlow" doc:id="d37162d2-698e-4092-9750-1606ec29eadd" >
+		<java:invoke method="generateJwtToken(java.lang.String,java.lang.String)" doc:name="Invoke" doc:id="7ca6ce99-581c-4734-b106-b501333ed1b4" instance="jwtObject" class="com.generator.Jwt" target="token" >
+			<java:args ><![CDATA[#[{name:payload.Name,  userId:vars.userId}]]]></java:args>
+		</java:invoke>
+	</sub-flow>
+	<sub-flow name="implementation_saveToken_SubFlow" doc:id="32d3bf2a-7bbd-4fe9-880d-d37ab2703661" >
+		<db:insert doc:name="Insert token" doc:id="1ded7537-08df-434e-b678-ac3865f80883" config-ref="user_db_config">
+			<db:sql >insert into token(token, userId) values( :token,  :userId)</db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	token: vars.token,
+	userId: vars.userId	
+}]]]></db:input-parameters>
+		</db:insert>
+	</sub-flow>
+	<sub-flow name="implementation_updateToken_SubFlow" doc:id="3b387cb5-1e67-43ab-91ed-7895e1929b8b" >
+		<db:update doc:name="Update" doc:id="f084a730-df05-4587-9eb6-be6b7f80f27d" config-ref="user_db_config">
+			<db:sql>update token
+set token = :token
+where userId = :userId</db:sql>
+			<db:input-parameters><![CDATA[#[{
+	token: vars.token,
+	userId: vars.userId	
+}]]]></db:input-parameters>
+		</db:update>
+	</sub-flow>
+	<error-handler name="implementation_unathorizedAccessError_Handler" doc:id="44805bfd-592c-41b7-be25-4409b8aede8e" >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="0587aba0-1f8e-4170-83b5-88a6eb9cfa39" type="CODE:INVALID_VALUE, USER:NOT_FOUND, USER:WRONG_PASSWORD">
+					<logger level="INFO" doc:name="Logger" doc:id="56b080af-1f75-4acb-8583-be06e7f186f1" message="#[error.description]"/>
+			<set-variable value="401" doc:name="Set httpStatus" doc:id="79555d92-a8bd-48ab-a860-50beb92d9bf6" variableName="httpStatus" />
+					<set-payload value='#[output application/json --- {message: "Unathoirized: Access is denied. " ++ (error.description default "")}]' doc:name="Set Payload" doc:id="b35de440-8562-48bf-892d-d9a76fb67342" />
+				</on-error-continue>
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="1622713a-53da-4052-872b-621c367246dd" >
+			<set-payload value='#[output application/json --- {message: "Something went wrong. " ++ (error.description default "")}]' doc:name="Set Payload" doc:id="2bf0bae6-3495-4694-814f-0fef96859e94" />
+		</on-error-propagate>
+	</error-handler>
+	<sub-flow name="implementation_generateUniqueCode_SubFlow" doc:id="85c0f460-7a11-4f9c-bc89-ca67b70a1435" >
+ 		<java:invoke-static doc:name="Invoke static" doc:id="2a66b13a-a8d4-442d-8a3e-40907c8f2af1" class="com.generator.CodeGenerator" method="generateUniqueCode()" target="uniqueCode" />
+	</sub-flow>
+</mule>
